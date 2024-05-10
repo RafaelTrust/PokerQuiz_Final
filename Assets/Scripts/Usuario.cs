@@ -5,15 +5,6 @@ using System.Collections.Generic;
 [Serializable]
 public class Usuario
 {
-    /*
-        "_id": "6542d1d6a60acfd5a6b802bf",
-        "nome": "Pedro Carvalho",
-        "nick": "PedrinCar",
-        "email": "carvalho_pedro@email.com",
-        "senha": "$2b$10$mY0jLvA4lqWow/nvlcoM/eRtPveQ5nrvKaHKmzppf7ut1gGdWhftW",
-        "codValida": null,
-        "__v": 0
-     */
     public string _id;
     public string nome;
     public string nick;

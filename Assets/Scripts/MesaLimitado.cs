@@ -5,10 +5,9 @@ using UnityEngine;
 public class MesaLimitado 
 {
     public string nome;
-    public string senha;
-    public float dinheiroPorJogador;
     public string responsavel_fk;
-    public int limitJogadores;
+    public string tema;
     public int limitPerguntas;
     public string codSala;
+    public bool publico;
 }

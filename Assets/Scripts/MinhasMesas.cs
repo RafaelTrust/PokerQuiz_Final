@@ -4,9 +4,7 @@ using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.UI;
 using TMPro;
-using System.Text;
-using System.Collections.Generic;
-using System.Reflection;
+using Newtonsoft.Json;
 
 
 public class MinhasMesas : MonoBehaviour
@@ -15,14 +13,10 @@ public class MinhasMesas : MonoBehaviour
     public Animator telas;
     public GameObject telaErro;
     public GameObject telaEditar;
-    public TextMeshProUGUI contadorJogadoresEditar;
     public TextMeshProUGUI contadorPerguntasEditar;
-    public TextMeshProUGUI contadorJogadoresCriar;
     public TextMeshProUGUI contadorPerguntasCriar;
-    public GameObject limitJogadoresEditar;
     public GameObject limitPerguntasEditar;
-    public GameObject forcaSenhaEditar;
-    public GameObject forcaSenhaCriar;
+    public GameObject[] criarPergunta;
     public GameObject[] listaPerguntas;
     public GameObject[] listaMesasTela;
     public GameObject paginacaoAnteriorPergunta;
@@ -32,32 +26,132 @@ public class MinhasMesas : MonoBehaviour
     public GameObject perguntaEditar;
     public GameObject telaPergunta;
     public TextMeshProUGUI contadorPerguntas;
+    public Animator carregamento;
     private bool criar;
     private bool entradaCriar;
     private ListaMesas conjuntoMesas;
     private ListaPerguntasOnline conjuntoPergunta;
     private Mesa mesaRes;
     private MesaLimitado formMesa;
-    private bool arrumandoCampoSenha;
     private List<List<PerguntaOnline>> gruposPaginacaoPergunta;
     private List<List<Mesa>> gruposPaginacaoMesa;
     private PerguntaOnlineLimitado formPergunta;
     private List<PerguntaOnlineLimitado> listFormPergunta;
-    private int indicePerguntaGravando;
     private int pagina;
+    private string idPerguntaEditar;
     private ListaMesas auxPesqMesas;
+    private string temaMesa;
 
     private void Start()
     {
         mesaRes = new Mesa();
-        arrumandoCampoSenha = true;
         formMesa = new MesaLimitado();
         formPergunta = new PerguntaOnlineLimitado();
         listFormPergunta = new List<PerguntaOnlineLimitado>();
         pagina = 0;
-        indicePerguntaGravando = 0;
         criar = false;
         entradaCriar = false;
+    }
+
+    public void TemaOnChange(string tema)
+    {
+        formMesa.tema = tema.Replace("\u200b", "");
+    }
+
+    public void GerarPerguntaPorAI(bool criar)
+    {
+        StartCoroutine(GetGerarPerguntaPorAI(criar));
+    }
+
+    private IEnumerator GetGerarPerguntaPorAI(bool criar)
+    {
+        carregamento.SetTrigger("carregar");
+        string tema = criar ? temaMesa : mesaRes.tema;
+        GerarIAPergunta gerar = new GerarIAPergunta();
+        gerar.tema = tema;
+        if (listFormPergunta != null)
+        {
+            gerar.jsonPerguntas = JsonConvert.SerializeObject(listFormPergunta);
+        }
+        else if (conjuntoPergunta.listaPerguntas.Length > 0)
+        {
+            List<PerguntaOnlineLimitado> listaPerguntas = new List<PerguntaOnlineLimitado>();
+            foreach(PerguntaOnline pergunta in conjuntoPergunta.listaPerguntas)
+            {
+                PerguntaOnlineLimitado auxPergunta = new PerguntaOnlineLimitado();
+                auxPergunta.enun = pergunta.enun;
+                auxPergunta.alternativa1 = pergunta.alternativa1;
+                auxPergunta.alternativa2 = pergunta.alternativa2;
+                auxPergunta.alternativa3 = pergunta.alternativa3;
+                auxPergunta.alternativa4 = pergunta.alternativa4;
+                auxPergunta.correto = pergunta.correto;
+                auxPergunta.timer = pergunta.timer;
+                auxPergunta.sala_fk = pergunta.sala_fk;
+                listaPerguntas.Add(auxPergunta);
+            }
+            gerar.jsonPerguntas = JsonConvert.SerializeObject(listaPerguntas);
+        }
+        else
+        {
+            gerar.jsonPerguntas = string.Empty;
+        }
+        var getRequest = gameControler.CreateRequest(
+            gameControler.UrlRota + "/perguntas/ai-generate",
+            true,
+            GameControler.RequestType.GET,
+            JsonUtility.ToJson(gerar)
+            );
+        yield return getRequest.SendWebRequest();
+        if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
+        {
+            carregamento.SetTrigger("carregar");
+            telaErro.SetActive(true);
+            telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Mesa não encontrada. \nVerifique sua conexão";
+            Debug.LogError(getRequest.error);
+        }
+        else
+        {
+            carregamento.SetTrigger("carregar");
+            PerguntaOnlineLimitado pergunta = JsonUtility.FromJson<PerguntaOnlineLimitado>(getRequest.downloadHandler.text);
+            if (criar)
+            {
+                PreencherCamposCriarPergunta(pergunta);
+            }
+            else
+            {
+                PerguntaOnline auxPergunta = new PerguntaOnline();
+                auxPergunta.enun = pergunta.enun;
+                auxPergunta.alternativa1 = pergunta.alternativa1;
+                auxPergunta.alternativa2 = pergunta.alternativa2;
+                auxPergunta.alternativa3 = pergunta.alternativa3;
+                auxPergunta.alternativa4 = pergunta.alternativa4;
+                auxPergunta.correto = pergunta.correto;
+                auxPergunta.timer = pergunta.timer;
+                auxPergunta._id = idPerguntaEditar;
+                auxPergunta.sala_fk = pergunta.sala_fk;
+
+                PreencherCamposEditarPergunta(auxPergunta);
+            }
+        }
+    }
+
+    private void PreencherCamposCriarPergunta(PerguntaOnlineLimitado pergunta)
+    {
+        criarPergunta[0].GetComponentsInChildren<TMP_InputField>()[0].text = pergunta.enun;
+        criarPergunta[1].GetComponentsInChildren<TMP_InputField>()[0].text = pergunta.alternativa1;
+        criarPergunta[2].GetComponentsInChildren<TMP_InputField>()[0].text = pergunta.alternativa2;
+        criarPergunta[3].GetComponentsInChildren<TMP_InputField>()[0].text = pergunta.alternativa3;
+        criarPergunta[4].GetComponentsInChildren<TMP_InputField>()[0].text = pergunta.alternativa4;
+        criarPergunta[pergunta.correto].GetComponentsInChildren<Toggle>()[0].isOn = true;
+        criarPergunta[5].GetComponentsInChildren<TMP_InputField>()[0].GetComponentsInChildren<TextMeshProUGUI>()[0].text = pergunta.timer.ToString();
+        formPergunta.enun = pergunta.enun;
+        formPergunta.alternativa1 = pergunta.alternativa1;
+        formPergunta.alternativa2 = pergunta.alternativa2;
+        formPergunta.alternativa3 = pergunta.alternativa3;
+        formPergunta.alternativa4 = pergunta.alternativa4;
+        formPergunta.correto = pergunta.correto;
+        formPergunta.timer = pergunta.timer;
+        formPergunta.sala_fk = pergunta.sala_fk;
     }
 
     public void VoltarCriacaoMesa()
@@ -90,7 +184,6 @@ public class MinhasMesas : MonoBehaviour
     private void AcrescentandoPerguntaParaCadastrar(PerguntaOnlineLimitado formularioPergunta)
     {
         listFormPergunta.Add(formularioPergunta);
-        int index = 0;
         contadorPerguntas.text = listFormPergunta.Count.ToString();
         formPergunta = new PerguntaOnlineLimitado();
         LimparTelaPerguntas(false);
@@ -99,6 +192,7 @@ public class MinhasMesas : MonoBehaviour
     public void EntrandoCriarMesa()
     {
         formMesa = new MesaLimitado();
+        temaMesa = string.Empty;
         listFormPergunta = new List<PerguntaOnlineLimitado>();
         criar = true;
         entradaCriar = true;
@@ -109,8 +203,7 @@ public class MinhasMesas : MonoBehaviour
     {
         if (
             !string.IsNullOrEmpty(formMesa.nome) &&
-            formMesa.limitJogadores != 0 &&
-            formMesa.dinheiroPorJogador != 0.0f &&
+            formMesa.tema != string.Empty &&
             formMesa.limitPerguntas != 0
             )
         {
@@ -120,6 +213,7 @@ public class MinhasMesas : MonoBehaviour
                 listFormPergunta = new List<PerguntaOnlineLimitado>();
             }
             LimparTelaPerguntas(entradaCriar);
+            temaMesa = formMesa.tema;
         }
         else
         {
@@ -148,7 +242,6 @@ public class MinhasMesas : MonoBehaviour
         if(listFormPergunta.Count >= formMesa.limitPerguntas)
         {
             formMesa.responsavel_fk = PlayerPrefs.GetString("id");
-            indicePerguntaGravando = 0;
             StartCoroutine(CreateMesaRequest());
         }
         else
@@ -160,10 +253,9 @@ public class MinhasMesas : MonoBehaviour
 
     private IEnumerator CreateMesaRequest()
     {
+        carregamento.SetTrigger("carregar");
         Debug.Log("Mesa: \nNome: " + formMesa.nome 
-            + "\nSenha: " + formMesa.senha
-            + "\nLimite Jogadores: " + formMesa.limitJogadores
-            + "\nDinheiro: " + formMesa.dinheiroPorJogador
+            + "\ntema: " + formMesa.tema
             + "\nLimite Perguntas: " + formMesa.limitPerguntas
             + "\nResponsavel: " + formMesa.responsavel_fk
             );
@@ -176,6 +268,7 @@ public class MinhasMesas : MonoBehaviour
         yield return getRequest.SendWebRequest();
         if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
+            carregamento.SetTrigger("carregar");
             telaErro.SetActive(true);
             telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Erro ao Criar Mesa. \nTodos os campos menos a senha são obrigatorios";
             Debug.LogError(getRequest.error);
@@ -183,7 +276,13 @@ public class MinhasMesas : MonoBehaviour
         else
         {
             mesaRes = new Mesa();
-            conjuntoMesas = JsonUtility.FromJson<ListaMesas>(getRequest.downloadHandler.text);
+            ListaMesas listaMesa = JsonUtility.FromJson<ListaMesas>(getRequest.downloadHandler.text);
+            int numeroMesas = listaMesa.mesas.Length;
+            conjuntoMesas.mesas = new Mesa[numeroMesas];
+            for (int i = 0; i < numeroMesas; i++)
+            {
+                conjuntoMesas.mesas[i] = listaMesa.mesas[i];
+            }
             foreach (Mesa mesa in conjuntoMesas.mesas)
             {
                 if(mesa.nome == formMesa.nome)
@@ -202,6 +301,7 @@ public class MinhasMesas : MonoBehaviour
 
     private IEnumerator DeleteMesaRequest()
     {
+        carregamento.SetTrigger("carregar");
         var getRequest = gameControler.CreateRequest(
             gameControler.UrlRota + "/salas/" + mesaRes._id,
             true,
@@ -211,14 +311,22 @@ public class MinhasMesas : MonoBehaviour
         yield return getRequest.SendWebRequest();
         if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
+            carregamento.SetTrigger("carregar");
             telaErro.SetActive(true);
             telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Mesa não encontrada. \nVerifique sua conexão";
             Debug.LogError(getRequest.error);
         }
         else
         {
+            carregamento.SetTrigger("carregar");
             telas.SetTrigger("MinhaMesa");
-            conjuntoMesas = JsonUtility.FromJson<ListaMesas>(getRequest.downloadHandler.text);
+            ListaMesas listaMesa = JsonUtility.FromJson<ListaMesas>(getRequest.downloadHandler.text);
+            int numeroMesas = listaMesa.mesas.Length;
+            conjuntoMesas.mesas = new Mesa[numeroMesas];
+            for(int i = 0; i < numeroMesas; i++)
+            {
+                conjuntoMesas.mesas[i] = listaMesa.mesas[i];
+            }
             OrganizandoMesas();
         }
     }
@@ -230,6 +338,7 @@ public class MinhasMesas : MonoBehaviour
 
     private IEnumerator DeletePerguntaRequest(string id)
     {
+        carregamento.SetTrigger("carregar");
         var getRequest = gameControler.CreateRequest(
             gameControler.UrlRota + "/perguntas/" + id,
             true,
@@ -239,18 +348,32 @@ public class MinhasMesas : MonoBehaviour
         yield return getRequest.SendWebRequest();
         if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
+            carregamento.SetTrigger("carregar");
             telaErro.SetActive(true);
             telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Pergunta não encontrada. \nVerifique sua conexão";
             Debug.LogError(getRequest.error);
         }
         else
         {
-            telas.SetTrigger("editar");
-            if (conjuntoPergunta.listaPerguntas.Length > 6)
+            carregamento.SetTrigger("carregar");
+            int numeroPerguntas = conjuntoPergunta.listaPerguntas.Length - 1;
+            PerguntaOnline[] auxListaPergunta = new PerguntaOnline[numeroPerguntas];
+            int j = 0;
+            foreach(PerguntaOnline pergunta in conjuntoPergunta.listaPerguntas)
             {
-                int[] index = encontrarPerguntas(id, true);
-
+                if(pergunta._id != id)
+                {
+                    auxListaPergunta[j] = pergunta;
+                    j++;
+                }
             }
+            conjuntoPergunta.listaPerguntas = new PerguntaOnline[numeroPerguntas];
+            for(int i = 0; i < numeroPerguntas; i++)
+            {
+                conjuntoPergunta.listaPerguntas[i] = auxListaPergunta[i];
+            }
+            ArrumandoListaPerguntas();
+            telas.SetTrigger("Editar");
         }
     }
 
@@ -289,6 +412,7 @@ public class MinhasMesas : MonoBehaviour
 
     public void EntrarCriarPergunta()
     {
+        criar = true;
         formPergunta = new PerguntaOnlineLimitado();
         telas.SetTrigger("CriarPergunta");
     }
@@ -331,21 +455,21 @@ public class MinhasMesas : MonoBehaviour
             yield return getRequest.SendWebRequest();
             if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
             {
+                carregamento.SetTrigger("carregar");
                 telaErro.SetActive(true);
                 telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Pergunta não encontrada. \nVerifique sua conexão";
                 Debug.LogError(getRequest.error);
             }
-            else
-            {
-                conjuntoMesas = JsonUtility.FromJson<ListaMesas>(getRequest.downloadHandler.text);
-            }
         }
-        telas.SetTrigger("CriarPergunta");
+        carregamento.SetTrigger("carregar");
+        Debug.Log("numero mesas: " + conjuntoMesas.mesas.Length);
         OrganizandoMesas();
+        telas.SetTrigger("CriarPergunta");
     }
 
     private IEnumerator CreatePerguntaUnitariaRequest()
     {
+        carregamento.SetTrigger("carregar");
         var getRequest = gameControler.CreateRequest(
             gameControler.UrlRota + "/perguntas",
             true,
@@ -355,12 +479,14 @@ public class MinhasMesas : MonoBehaviour
         yield return getRequest.SendWebRequest();
         if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
+            carregamento.SetTrigger("carregar");
             telaErro.SetActive(true);
             telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Pergunta não encontrada. \nVerifique sua conexão";
             Debug.LogError(getRequest.error);
         }
         else
         {
+            carregamento.SetTrigger("carregar");
             LimparCamposEditarPergunta();
             conjuntoPergunta = JsonUtility.FromJson<ListaPerguntasOnline>(getRequest.downloadHandler.text);
             foreach (GameObject perguntaTela in listaPerguntas)
@@ -373,11 +499,12 @@ public class MinhasMesas : MonoBehaviour
 
     public void GravarEdicaoPergunta(TextMeshProUGUI id)
     {
-        StartCoroutine(UpdatePerguntaRequest(id.text.Replace("\u200b", "")));
+        StartCoroutine(UpdatePerguntaRequest(id.text));
     }
 
     private IEnumerator UpdatePerguntaRequest(string id)
     {
+        carregamento.SetTrigger("carregar");
         var getRequest = gameControler.CreateRequest(
             gameControler.UrlRota + "/perguntas/" + id,
             true,
@@ -387,12 +514,14 @@ public class MinhasMesas : MonoBehaviour
         yield return getRequest.SendWebRequest();
         if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
+            carregamento.SetTrigger("carregar");
             telaErro.SetActive(true);
             telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Pergunta não encontrada. \nVerifique sua conexão";
             Debug.LogError(getRequest.error);
         }
         else
         {
+            carregamento.SetTrigger("carregar");
             telas.SetTrigger("Editar");
             LimparCamposEditarPergunta();
             PerguntaOnline perguntaAtualizada = JsonUtility.FromJson<PerguntaOnline>(getRequest.downloadHandler.text);
@@ -484,6 +613,7 @@ public class MinhasMesas : MonoBehaviour
 
     public void BuscarPergunta(TextMeshProUGUI id)
     {
+        idPerguntaEditar = id.text;
         telas.SetTrigger("Editar");
         foreach (var pergunta in conjuntoPergunta.listaPerguntas)
         {
@@ -542,14 +672,14 @@ public class MinhasMesas : MonoBehaviour
     {
         gameControler.ProximoPaginacao(gruposPaginacaoPergunta.Count, paginacaoAnteriorPergunta, paginacaoProximoPergunta, pagina);
         pagina++;
-        gameControler.ExibirGrupoPaginacaoTela(listaPerguntas, GameControler.DadosType.PERGUNTA, gruposPaginacaoPergunta[pagina - 1]);
+        gameControler.ExibirGrupoPaginacaoTela(listaPerguntas, GameControler.DadosType.PERGUNTA, gruposPaginacaoPergunta[pagina - 1], 6);
     }
 
     public void AnteriorPergunta()
     {
         gameControler.AnteriorPaginacao(gruposPaginacaoPergunta.Count, paginacaoAnteriorPergunta, paginacaoProximoPergunta, pagina);
         pagina--;
-        gameControler.ExibirGrupoPaginacaoTela(listaPerguntas, GameControler.DadosType.PERGUNTA, gruposPaginacaoPergunta[pagina - 1]);
+        gameControler.ExibirGrupoPaginacaoTela(listaPerguntas, GameControler.DadosType.PERGUNTA, gruposPaginacaoPergunta[pagina - 1], 6);
     }
 
     public void BuscarTodasPerguntas()
@@ -559,6 +689,7 @@ public class MinhasMesas : MonoBehaviour
 
     private IEnumerator GetListPerguntaRequest()
     {
+        carregamento.SetTrigger("carregar");
         var getRequest = gameControler.CreateRequest(
             gameControler.UrlRota + "/perguntas/sala/" + mesaRes._id,
             true,
@@ -568,12 +699,14 @@ public class MinhasMesas : MonoBehaviour
         yield return getRequest.SendWebRequest();
         if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
+            carregamento.SetTrigger("carregar");
             telaErro.SetActive(true);
             telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Lista não encontrada. \nVerifique sua conexão";
             Debug.LogError(getRequest.error);
         }
         else
         {
+            carregamento.SetTrigger("carregar");
             telas.SetTrigger("Pergunta");
             conjuntoPergunta = JsonUtility.FromJson<ListaPerguntasOnline>(getRequest.downloadHandler.text);
             ArrumandoListaPerguntas();
@@ -582,7 +715,11 @@ public class MinhasMesas : MonoBehaviour
 
     private void ArrumandoListaPerguntas()
     {
-        if (conjuntoPergunta.listaPerguntas.Length > 7)
+        foreach(GameObject pergunta in listaPerguntas)
+        {
+            pergunta.SetActive(true);
+        }
+        if (conjuntoPergunta.listaPerguntas.Length >= 6)
         {
             paginacaoProximoPergunta.SetActive(true);
             paginacaoAnteriorPergunta.SetActive(false);
@@ -613,27 +750,6 @@ public class MinhasMesas : MonoBehaviour
         }
     }
 
-    public void OnToggleSenhaChanged(bool troca)
-    {
-        arrumandoCampoSenha = troca;
-    }
-
-    public void OnLimiteJogadoresChanged(float value)
-    {
-        if(value != mesaRes.limitJogadores)
-        {
-            if (criar)
-            {
-                contadorJogadoresCriar.text = value.ToString();
-            }
-            else
-            {
-                contadorJogadoresEditar.text = value.ToString();
-            }
-            formMesa.limitJogadores = (int)value;
-        }
-    }
-
     public void OnLimitePerguntasChanged(float value)
     {
         if(value != mesaRes.limitPerguntas)
@@ -651,47 +767,29 @@ public class MinhasMesas : MonoBehaviour
         }
     }
 
-    public void OnDinheroByJogadorChanged(string dinheiro)
-    {
-        formMesa.dinheiroPorJogador = float.Parse(dinheiro.Replace("\u200b", ""));
-    }
-
     public void OnNomeMesaChanged(string nome)
     {
         formMesa.nome = nome.Replace("\u200b", "");
     }
 
-    public void OnSenhaChanged(string senha)
+    public void OnTogglePublicoChanged(bool troca)
     {
-        formMesa.senha = senha.Replace("\u200b", "");
-        GameObject forcaSenha = criar ? forcaSenhaCriar : forcaSenhaEditar;
-        int forca = gameControler.MedindoForcaSenha(senha);
-        forcaSenha.GetComponentsInChildren<Slider>()[0].value = forca;
-        forcaSenha.GetComponentsInChildren<TextMeshProUGUI>()[0].text = gameControler.GetForcaText(forca);
-        forcaSenha.GetComponentsInChildren<TextMeshProUGUI>()[0].color = gameControler.GetColorForca(forca);
+        formMesa.publico = troca; 
     }
 
     public void GravandoEdicaoMesa()
     {
         formMesa.nome = !string.IsNullOrEmpty(formMesa.nome) ? formMesa.nome : mesaRes.nome;
-        if (arrumandoCampoSenha)
-        {
-            formMesa.senha = !string.IsNullOrEmpty(formMesa.senha) ? formMesa.senha : mesaRes.senha;
-        }
-        else
-        {
-            formMesa.senha = null;
-        }
-        formMesa.limitJogadores = formMesa.limitJogadores != mesaRes.limitJogadores ? mesaRes.limitJogadores : formMesa.limitJogadores;
         formMesa.limitPerguntas = formMesa.limitPerguntas != mesaRes.limitPerguntas ? mesaRes.limitPerguntas : formMesa.limitPerguntas;
-        formMesa.dinheiroPorJogador = formMesa.dinheiroPorJogador != mesaRes.dinheiroPorJogador ? mesaRes.dinheiroPorJogador : formMesa.dinheiroPorJogador;
         formMesa.codSala = mesaRes.codSala;
         formMesa.responsavel_fk = mesaRes.responsavel_fk;
+        formMesa.tema = !string.IsNullOrEmpty(formMesa.tema) ? formMesa.tema : mesaRes.tema;
         StartCoroutine(PostMesaRequest());
     }
 
     private IEnumerator PostMesaRequest()
-    { 
+    {
+        carregamento.SetTrigger("carregar");
         var getRequest = gameControler.CreateRequest(
             gameControler.UrlRota + "/salas/" + mesaRes._id,
             true,
@@ -701,14 +799,17 @@ public class MinhasMesas : MonoBehaviour
         yield return getRequest.SendWebRequest();
         if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
+            carregamento.SetTrigger("carregar");
             telaErro.SetActive(true);
             telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Mesa não encontrada. \nVerifique sua conexão";
             Debug.LogError(getRequest.error);
         }
         else
         {
+            carregamento.SetTrigger("carregar");
             telas.SetTrigger("Editar");
             mesaRes = JsonUtility.FromJson<Mesa>(getRequest.downloadHandler.text);
+            
             ColocandoValores();
         }
     }
@@ -726,6 +827,7 @@ public class MinhasMesas : MonoBehaviour
 
     private IEnumerator GetMesaRequest(string cod)
     {
+        carregamento.SetTrigger("carregar");
         var getRequest = gameControler.CreateRequest(
             gameControler.UrlRota + "/salas/" + cod,
             true,
@@ -735,14 +837,20 @@ public class MinhasMesas : MonoBehaviour
         yield return getRequest.SendWebRequest();
         if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
+            carregamento.SetTrigger("carregar");
             telaErro.SetActive(true);
             telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Mesa não encontrada. \nVerifique sua conexão";
             Debug.LogError(getRequest.error);
         }
         else
         {
+            carregamento.SetTrigger("carregar");
             telas.SetTrigger("EditarMesa");
             mesaRes = JsonUtility.FromJson<Mesa>(getRequest.downloadHandler.text);
+            formMesa = new MesaLimitado();
+            formMesa.tema = string.Empty;
+            temaMesa = mesaRes.tema;
+            Debug.Log("tema buscado: " + mesaRes.tema);
             ColocandoValores();
         }
     }
@@ -751,27 +859,9 @@ public class MinhasMesas : MonoBehaviour
     {
         telaEditar.GetComponentsInChildren<TMP_InputField>()[0].text = string.Empty;
         telaEditar.GetComponentsInChildren<TMP_InputField>()[0].GetComponentsInChildren<TextMeshProUGUI>()[0].text = mesaRes.nome;
-        if (!string.IsNullOrEmpty(mesaRes.senha))
-        {
-            telaEditar.GetComponentsInChildren<Toggle>()[0].isOn = true;
-            telaEditar.GetComponentsInChildren<TMP_InputField>()[1].text = string.Empty;
-            telaEditar.GetComponentsInChildren<TMP_InputField>()[1].GetComponentsInChildren<TextMeshProUGUI>()[0].text = mesaRes.senha;
-            GameObject forcaSenha = forcaSenhaEditar;
-            int forca = gameControler.MedindoForcaSenha(mesaRes.senha);
-            forcaSenha.GetComponentsInChildren<Slider>()[0].value = forca;
-            forcaSenha.GetComponentsInChildren<TextMeshProUGUI>()[0].text = gameControler.GetForcaText(forca);
-            forcaSenha.GetComponentsInChildren<TextMeshProUGUI>()[0].color = gameControler.GetColorForca(forca);
-        }
-        else
-        {
-            telaEditar.GetComponentsInChildren<Toggle>()[0].isOn = false;
-            telaEditar.GetComponentsInChildren<TMP_InputField>()[1].text = string.Empty;
-            telaEditar.GetComponentsInChildren<TMP_InputField>()[1].GetComponentsInChildren<TextMeshProUGUI>()[0].text = string.Empty;
-        }
-        limitJogadoresEditar.GetComponent<Slider>().value = mesaRes.limitJogadores;
-        limitJogadoresEditar.GetComponentsInChildren<TextMeshProUGUI>()[0].text = mesaRes.limitJogadores.ToString();
-        telaEditar.GetComponentsInChildren<TMP_InputField>()[2].text = string.Empty;
-        telaEditar.GetComponentsInChildren<TMP_InputField>()[2].GetComponentsInChildren<TextMeshProUGUI>()[0].text = mesaRes.dinheiroPorJogador.ToString();
+        telaEditar.GetComponentsInChildren<TMP_InputField>()[1].text = string.Empty;
+        telaEditar.GetComponentsInChildren<TMP_InputField>()[1].GetComponentsInChildren<TextMeshProUGUI>()[0].text = mesaRes.tema;
+        telaEditar.GetComponentsInChildren<Toggle>()[0].isOn = mesaRes.publico;
         limitPerguntasEditar.GetComponent<Slider>().value = mesaRes.limitPerguntas;
         limitPerguntasEditar.GetComponentsInChildren<TextMeshProUGUI>()[0].text = mesaRes.limitPerguntas.ToString();
     }
@@ -834,6 +924,7 @@ public class MinhasMesas : MonoBehaviour
     }
     private IEnumerator GetListaMesasRequest()
     {
+        carregamento.SetTrigger("carregar");
         var getRequest = gameControler.CreateRequest(
             gameControler.UrlRota + "/salas/responsavel/" + PlayerPrefs.GetString("id"),
             true,
@@ -843,6 +934,7 @@ public class MinhasMesas : MonoBehaviour
         yield return getRequest.SendWebRequest();
         if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
+            carregamento.SetTrigger("carregar");
             telas.SetTrigger("Login");
             telaErro.SetActive(true);
             telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Usuario não Encontrado. \nÉ necessário estar logado para acessar esse modulo";
@@ -850,6 +942,7 @@ public class MinhasMesas : MonoBehaviour
         }
         else
         {
+            carregamento.SetTrigger("carregar");
             conjuntoMesas = new ListaMesas();
             auxPesqMesas = new ListaMesas();
             telas.SetTrigger("MinhaMesa");
@@ -865,7 +958,8 @@ public class MinhasMesas : MonoBehaviour
         {
             mesa.SetActive(true);
         }
-        if (conjuntoMesas.mesas.Length >= 5)
+        Debug.Log("numero de mesas: " + conjuntoMesas.mesas.Length);
+        if (conjuntoMesas.mesas.Length > 4)
         {
             paginacaoAnteriorMesa.SetActive(false);
             paginacaoProximoMesa.SetActive(true);
@@ -873,6 +967,8 @@ public class MinhasMesas : MonoBehaviour
             {
                 listaMesasTela[i].GetComponentsInChildren<TextMeshProUGUI>()[0].text = conjuntoMesas.mesas[i].nome;
                 listaMesasTela[i].GetComponentsInChildren<TextMeshProUGUI>()[1].text = conjuntoMesas.mesas[i].codSala;
+                listaMesasTela[i].GetComponentsInChildren<Image>()[1].enabled = conjuntoMesas.mesas[i].publico;
+                listaMesasTela[i].GetComponentsInChildren<Image>()[2].enabled = conjuntoMesas.mesas[i].publico;
             }
             gruposPaginacaoMesa = gameControler.DividirArray(conjuntoMesas.mesas, 4);
             pagina = 1;
@@ -887,6 +983,8 @@ public class MinhasMesas : MonoBehaviour
                 {
                     listaMesasTela[i].GetComponentsInChildren<TextMeshProUGUI>()[0].text = conjuntoMesas.mesas[i].nome;
                     listaMesasTela[i].GetComponentsInChildren<TextMeshProUGUI>()[1].text = conjuntoMesas.mesas[i].codSala;
+                    listaMesasTela[i].GetComponentsInChildren<Image>()[1].enabled = conjuntoMesas.mesas[i].publico;
+                    listaMesasTela[i].GetComponentsInChildren<Image>()[2].enabled = conjuntoMesas.mesas[i].publico;
                 }
                 else
                 {
@@ -900,14 +998,14 @@ public class MinhasMesas : MonoBehaviour
     {
         gameControler.ProximoPaginacao(gruposPaginacaoMesa.Count, paginacaoAnteriorMesa, paginacaoProximoMesa, pagina);
         pagina++;
-        gameControler.ExibirGrupoPaginacaoTela(listaMesasTela, GameControler.DadosType.MESA, gruposPaginacaoMesa[pagina - 1]);
+        gameControler.ExibirGrupoPaginacaoTela(listaMesasTela, GameControler.DadosType.MINHAMESA, gruposPaginacaoMesa[pagina - 1], 4);
     }
 
     public void AnteriorMesa()
     {
         gameControler.AnteriorPaginacao(gruposPaginacaoMesa.Count, paginacaoAnteriorMesa, paginacaoProximoMesa, pagina);
         pagina--;
-        gameControler.ExibirGrupoPaginacaoTela(listaMesasTela, GameControler.DadosType.MESA, gruposPaginacaoMesa[pagina - 1]);
+        gameControler.ExibirGrupoPaginacaoTela(listaMesasTela, GameControler.DadosType.MINHAMESA, gruposPaginacaoMesa[pagina - 1], 4);
     }
 
    

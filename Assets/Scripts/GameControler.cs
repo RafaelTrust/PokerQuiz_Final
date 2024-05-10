@@ -15,7 +15,7 @@ public class GameControler : MonoBehaviour
     public GameObject menu;
     public GameObject telaFichas;
     public GameObject telaErro;
-    public string UrlRota = "http://localhost:3003";
+    public string UrlRota;
 
     public AudioControler audioSource;
     private bool fecharJogo;
@@ -26,6 +26,9 @@ public class GameControler : MonoBehaviour
     void Start()
     {
         FecharJogo = true;
+        //UrlRota = "https://poker-quiz-1ca4z7zx0-rafaeltrusts-projects.vercel.app";
+        UrlRota = "https://poker-quiz-rep-rafaeltrusts-projects.vercel.app";
+        //UrlRota = "http://localhost:3003";
     }
 
     public List<List<T>> DividirArray<T>(T[] array, int tamanhoDoGrupo)
@@ -84,7 +87,7 @@ public class GameControler : MonoBehaviour
             menu.GetComponent<Animator>().SetTrigger("Fechar");
             telaFichas.GetComponent<Animator>().SetTrigger("Aparecer");
             FecharJogo = true;
-            jogoSolitario.GameOver();
+            jogoSolitario.GameOver(false,false);
         }
     }
 
@@ -171,6 +174,10 @@ public class GameControler : MonoBehaviour
         {
             request.SetRequestHeader("Authorization", "Bearer " + PlayerPrefs.GetString("token"));
         }
+        else
+        {
+            request.SetRequestHeader("Authorization", "Bearer ");
+        }
 
         return request;
     }
@@ -218,7 +225,7 @@ public class GameControler : MonoBehaviour
         }
     }
 
-    public void ExibirGrupoPaginacaoTela<T>(GameObject[] listaObjTela, DadosType tipo, List<T> listaObj)
+    public void ExibirGrupoPaginacaoTela<T>(GameObject[] listaObjTela, DadosType tipo, List<T> listaObj, int n)
     {
         foreach (GameObject obj in listaObjTela)
         {
@@ -226,13 +233,13 @@ public class GameControler : MonoBehaviour
         }
         Debug.Log("numero de itens na lista: " + listaObj.Count);
         Debug.Log("numero de itens na lista tela: " + listaObjTela.Length);
-        if (listaObj.Count < 6)
+        if (listaObj.Count < n)
         {
             for (int i = 0; i < listaObjTela.Length; i++)
             {
                 if (listaObj.Count > i)
                 {
-                    atualizarDadosPaginacao(DadosType.PERGUNTA, listaObjTela[i], listaObj[i]);
+                    atualizarDadosPaginacao(tipo, listaObjTela[i], listaObj[i]);
                 }
                 else
                 {
@@ -244,7 +251,7 @@ public class GameControler : MonoBehaviour
         {
             for (int i = 0; i < listaObjTela.Length; i++)
             {
-                atualizarDadosPaginacao(DadosType.PERGUNTA, listaObjTela[i], listaObj[i]);
+                atualizarDadosPaginacao(tipo, listaObjTela[i], listaObj[i]);
             }
         }
     }
@@ -259,11 +266,34 @@ public class GameControler : MonoBehaviour
         }
         else if (tipoDado == DadosType.PERGUNTA)
         {
-            Debug.Log("dado que entrou: " + dado.ToString());
             PerguntaOnline objDado = (PerguntaOnline)dado;
-            Debug.Log("dado dele: " + objDado.enun);
             objetoListadoTela.GetComponentsInChildren<TextMeshProUGUI>()[0].text = objDado.enun;
             objetoListadoTela.GetComponentsInChildren<TextMeshProUGUI>()[1].text = objDado._id;
+        }
+        else if (tipoDado == DadosType.RECORDE)
+        {
+            Recorde objDado = (Recorde)dado;
+            objetoListadoTela.GetComponentsInChildren<TextMeshProUGUI>()[0].text = objDado.nick;
+            objetoListadoTela.GetComponentsInChildren<TextMeshProUGUI>()[1].text = objDado.valor.ToString("F2");
+            objetoListadoTela.GetComponentsInChildren<TextMeshProUGUI>()[2].text = objDado.pcent_acertos.ToString("F2");
+        }
+        else if (tipoDado == DadosType.ESTATISTICA)
+        {
+            EstatisticaPorcentagem objDado = (EstatisticaPorcentagem)dado;
+            objetoListadoTela.GetComponentsInChildren<TextMeshProUGUI>()[0].text = objDado.pergunta_fk;
+            objetoListadoTela.GetComponentsInChildren<TextMeshProUGUI>()[1].text = objDado.acertos;
+            objetoListadoTela.GetComponentsInChildren<TextMeshProUGUI>()[2].text = objDado.alternativa1;
+            objetoListadoTela.GetComponentsInChildren<TextMeshProUGUI>()[3].text = objDado.alternativa2;
+            objetoListadoTela.GetComponentsInChildren<TextMeshProUGUI>()[4].text = objDado.alternativa3;
+            objetoListadoTela.GetComponentsInChildren<TextMeshProUGUI>()[5].text = objDado.alternativa4;
+        }
+        else if (tipoDado == DadosType.MINHAMESA)
+        {
+            Mesa objDado = (Mesa)dado;
+            objetoListadoTela.GetComponentsInChildren<TextMeshProUGUI>()[0].text = objDado.nome;
+            objetoListadoTela.GetComponentsInChildren<TextMeshProUGUI>()[1].text = objDado.codSala;
+            objetoListadoTela.GetComponentsInChildren<Image>()[1].enabled = objDado.publico;
+            objetoListadoTela.GetComponentsInChildren<Image>()[2].enabled = objDado.publico;
         }
         else
         {
@@ -297,6 +327,9 @@ public class GameControler : MonoBehaviour
     {
         MESA = 0,
         PERGUNTA = 1,
+        RECORDE = 2,
+        ESTATISTICA = 3,
+        MINHAMESA = 4,
     }
 
     public enum RequestType

@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 
 public class Conta : MonoBehaviour
 {
+    public Animator carregamento;
     public GameControler gameController;
     public GameObject telaErro;
     public GameObject telaLogin;
@@ -183,13 +184,41 @@ public class Conta : MonoBehaviour
         if(token != null && nick != null)
         {
             Debug.Log("Carregando...");
-            StartCoroutine(BuscarConta(nick));
+            StartCoroutine(BuscarConta(nick, true));
         }
         else
         {
             telas.SetTrigger("Login");
+        }
+    }
+
+    public void VerificaConexao()
+    {
+        StartCoroutine(Verificando());
+    }
+
+    private IEnumerator Verificando()
+    {
+        carregamento.SetTrigger("carregar");
+        var getRequest = gameController.CreateRequest(
+            gameController.UrlRota + "/usuarios/verifica-nick/PedrinCar",
+            false,
+            GameControler.RequestType.GET,
+            null
+            );
+        yield return getRequest.SendWebRequest();
+        if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
+        {
+            carregamento.SetTrigger("carregar");
             telaErro.SetActive(true);
-            telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Usuario não Encontrado";
+            telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Erro ao Conectar";
+            Debug.LogError(getRequest.error);
+            Debug.Log(gameController.UrlRota + "/usuarios/verifica-nick/PedrinCar");
+        }
+        else
+        {
+            carregamento.SetTrigger("carregar");
+            Debug.Log("conectado");
         }
     }
 
@@ -221,11 +250,12 @@ public class Conta : MonoBehaviour
 
     private IEnumerator UpdateRequest()
     {
-       
-        this.tempUsuario.nome = !string.IsNullOrEmpty(tempUsuario.nome) ? tempUsuario.nome.Replace("\u200b", "") : usuario.nome;
-        this.tempUsuario.email = !string.IsNullOrEmpty(tempUsuario.email) ? tempUsuario.email.Replace("\u200b", "") : usuario.email;
-        this.tempUsuario.nick = !string.IsNullOrEmpty(tempUsuario.nick) ? tempUsuario.nick.Replace("\u200b", "") : usuario.nick;
-        this.tempUsuario.senha = !string.IsNullOrEmpty(tempUsuario.senha) ? tempUsuario.senha.Replace("\u200b", "") : usuario.senha;
+        carregamento.SetTrigger("carregar");
+        tempUsuario.nome = !string.IsNullOrEmpty(tempUsuario.nome) ? tempUsuario.nome.Replace("\u200b", "") : usuario.nome;
+        tempUsuario.email = !string.IsNullOrEmpty(tempUsuario.email) ? tempUsuario.email.Replace("\u200b", "") : usuario.email;
+        tempUsuario.nick = !string.IsNullOrEmpty(tempUsuario.nick) ? tempUsuario.nick.Replace("\u200b", "") : usuario.nick;
+        tempUsuario.senha = !string.IsNullOrEmpty(tempUsuario.senha) ? tempUsuario.senha.Replace("\u200b", "") : usuario.senha;
+        Debug.Log("url: " + gameController.UrlRota + "/usuarios/" + usuario._id);
         var getRequest = gameController.CreateRequest(
             gameController.UrlRota + "/usuarios/" + usuario._id,
             true,
@@ -235,13 +265,15 @@ public class Conta : MonoBehaviour
         yield return getRequest.SendWebRequest();
         if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
+            carregamento.SetTrigger("carregar");
             telaErro.SetActive(true);
             telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Erro ao Cadastrar. \n Verifique sua conexão com a internet";
             Debug.LogError(getRequest.error);
         }
         else
         {
-            if(senhaEditar)
+            carregamento.SetTrigger("carregar");
+            if (senhaEditar)
             {
                 telas.SetTrigger("Troca");
             }else if (senhaEsqueceu)
@@ -267,6 +299,7 @@ public class Conta : MonoBehaviour
 
     private IEnumerator DeslogarRequest()
     {
+        carregamento.SetTrigger("carregar");
         var getRequest = gameController.CreateRequest(
             gameController.UrlRota + "/api/auth/logout",
             true,
@@ -276,12 +309,15 @@ public class Conta : MonoBehaviour
         yield return getRequest.SendWebRequest();
         if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
+            carregamento.SetTrigger("carregar");
             telaErro.SetActive(true);
             telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Erro ao Deslogar";
             Debug.LogError(getRequest.error);
         }
         else
         {
+            carregamento.SetTrigger("carregar");
+            usuario = new Usuario();
             telas.SetTrigger("Conta");
             PlayerPrefs.SetString("token", "");
             PlayerPrefs.SetString("nick", "");
@@ -291,23 +327,28 @@ public class Conta : MonoBehaviour
 
     private IEnumerator LoginRequest()
     {
+        carregamento.SetTrigger("carregar");
         tempUsuario.email.Replace("\u200b", "");
         tempUsuario.senha.Replace("\u200b", "");
         var getRequest = gameController.CreateRequest(
-            gameController.UrlRota + "/api/auth/login",
-            false,
-            GameControler.RequestType.POST,
-            "{\"email\": \"" + tempUsuario.email + "\", \"password\": \"" + tempUsuario.senha + "\"}"
-            );
+             gameController.UrlRota + "/api/auth/login",
+             false,
+             GameControler.RequestType.POST,
+             "{\"email\": \"" + tempUsuario.email + "\", \"password\": \"" + tempUsuario.senha + "\"}"
+             );
         yield return getRequest.SendWebRequest();
         if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
+            carregamento.SetTrigger("carregar");
             telaErro.SetActive(true);
             telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Erro ao Logar";
             Debug.LogError(getRequest.error);
+            ErroRequest erro = JsonUtility.FromJson<ErroRequest>(getRequest.downloadHandler.text);
+            Debug.Log("messagem: " + erro.message);
         }
         else
         {
+            carregamento.SetTrigger("carregar");
             resLogin = JsonUtility.FromJson<LoginResponse>(getRequest.downloadHandler.text);
             if (!string.IsNullOrEmpty(resLogin.token))
             {
@@ -320,13 +361,12 @@ public class Conta : MonoBehaviour
             {
                 telas.SetTrigger("SucessCadastro");
             }
-
-            
         }
     }
 
     private IEnumerator CadastrarRequest()
     {
+        carregamento.SetTrigger("carregar");
         tempUsuario.nome.Replace("\u200b", "");
         tempUsuario.email.Replace("\u200b", "");
         tempUsuario.nick.Replace("\u200b", "");
@@ -340,18 +380,21 @@ public class Conta : MonoBehaviour
         yield return getRequest.SendWebRequest();
         if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
+            carregamento.SetTrigger("carregar");
             telaErro.SetActive(true);
             telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Erro ao Cadastrar. \n Verifique sua conexão com a internet";
             Debug.LogError(getRequest.error);
         }
         else
         {
+            carregamento.SetTrigger("carregar");
             telas.SetTrigger("SucessCadastro");
         }
     }
 
     private IEnumerator VerificaCadastroRequest(string cod)
     {
+        carregamento.SetTrigger("carregar");
         var getRequest = gameController.CreateRequest(
             gameController.UrlRota + "/usuarios/verifica-cadastro/" + cod.Replace("\u200b", ""),
             false,
@@ -361,12 +404,14 @@ public class Conta : MonoBehaviour
         yield return getRequest.SendWebRequest();
         if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
+            carregamento.SetTrigger("carregar");
             telaErro.SetActive(true);
             telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Codigo Invalido";
             Debug.LogError(getRequest.error);
         }
         else
         {
+            carregamento.SetTrigger("carregar");
             telas.SetTrigger("SucessCadastro");
             PlayerPrefs.SetString("token", getRequest.downloadHandler.text);
             PlayerPrefs.SetString("nick", tempUsuario.nick.Replace("\u200b", ""));
@@ -376,10 +421,12 @@ public class Conta : MonoBehaviour
 
     private IEnumerator VerificaNickRequest()
     {
+        carregamento.SetTrigger("carregar");
         var getRequest = gameController.CreateRequest(gameController.UrlRota + "/usuarios/verifica-nick/" + tempUsuario.nick.Replace("\u200b", ""), false, GameControler.RequestType.GET, null);
         yield return getRequest.SendWebRequest();
         if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
+            carregamento.SetTrigger("carregar");
             validacaoNick = false;
             if (tipoCadastro)
             {
@@ -392,6 +439,7 @@ public class Conta : MonoBehaviour
         }
         else
         {
+            carregamento.SetTrigger("carregar");
             validacaoNick = true;
             if (tipoCadastro)
             {
@@ -407,15 +455,18 @@ public class Conta : MonoBehaviour
 
     private IEnumerator VerificaEmailRequest()
     {
+        carregamento.SetTrigger("carregar");
         var getRequest = gameController.CreateRequest(gameController.UrlRota + "/usuarios/verifica-email/" + tempUsuario.email.Replace("\u200b", ""), false, GameControler.RequestType.GET, null);
         yield return getRequest.SendWebRequest();
         if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
+            carregamento.SetTrigger("carregar");
             validacaoEmail = false;
             telaCadastro.GetComponentsInChildren<TMP_InputField>()[2].GetComponentsInChildren<TextMeshProUGUI>()[1].color = gameController.HexToColor("#FF4747");
         }
         else
         {
+            carregamento.SetTrigger("carregar");
             validacaoEmail = true;
             telaCadastro.GetComponentsInChildren<TMP_InputField>()[2].GetComponentsInChildren<TextMeshProUGUI>()[1].color = gameController.HexToColor("#75EC51");
         }
@@ -423,16 +474,19 @@ public class Conta : MonoBehaviour
 
     private IEnumerator CodigoRecuperacaoEsqueceuSenhaRequest(string codigo)
     {
+        carregamento.SetTrigger("carregar");
         var getRequest = gameController.CreateRequest(gameController.UrlRota + "/usuarios/esquece/" + codigo.Replace("\u200b", ""), false, GameControler.RequestType.GET, null);
         yield return getRequest.SendWebRequest();
         if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
+            carregamento.SetTrigger("carregar");
             telaErro.SetActive(true);
             telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Codigo Incorreto";
             Debug.LogError(getRequest.error);
         }
         else
         {
+            carregamento.SetTrigger("carregar");
             telas.SetTrigger("Sucess");
             PlayerPrefs.SetString("token", getRequest.downloadHandler.text);
             PlayerPrefs.Save();
@@ -441,46 +495,65 @@ public class Conta : MonoBehaviour
 
     private IEnumerator EmailEsqueceuSenha(string mail)
     {
+        carregamento.SetTrigger("carregar");
         var getRequest = gameController.CreateRequest(this.gameController.UrlRota + "/usuarios/email/" + mail.Replace("\u200b", ""), false, GameControler.RequestType.GET, null);
         yield return getRequest.SendWebRequest();
         if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
+            carregamento.SetTrigger("carregar");
             telaErro.SetActive(true);
             telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Email Incorreto";
             Debug.LogError(getRequest.error.ToString());
         }
         else
         {
+            carregamento.SetTrigger("carregar");
             telas.SetTrigger("Reset");
             PlayerPrefs.SetString("email", mail);
             PlayerPrefs.Save();
-            Debug.Log("Passou o codigo: " + getRequest.downloadHandler.text);
+            usuario = new Usuario();
+            usuario = JsonUtility.FromJson<Usuario>(getRequest.downloadHandler.text);
         }
     }
 
-    private IEnumerator BuscarConta(string nick)
+    private IEnumerator BuscarConta(string nick, bool conta)
     {
+        carregamento.SetTrigger("carregar");
         var getRequest = gameController.CreateRequest(gameController.UrlRota + "/usuarios/" + nick, true, GameControler.RequestType.GET, null);
         yield return getRequest.SendWebRequest();
         if(getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
+            carregamento.SetTrigger("carregar");
+            if (!conta)
+            {
+                telaErro.SetActive(true);
+                telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Usuario não Encontrado";
+                Debug.LogError(getRequest.error);
+            }
             telas.SetTrigger("Login");
-            telaErro.SetActive(true);
-            telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Usuario não Encontrado";
-            Debug.LogError(getRequest.error);
         }
         else
         {
-            this.usuario = JsonUtility.FromJson<Usuario>(getRequest.downloadHandler.text);
-            telas.SetTrigger("Conta");
-            telaConta.GetComponentsInChildren<TMP_InputField>()[0].GetComponentsInChildren<TextMeshProUGUI>()[0].text = usuario.nome;
-            PlayerPrefs.SetString("nome", usuario.nome);
-            telaConta.GetComponentsInChildren<TMP_InputField>()[1].GetComponentsInChildren<TextMeshProUGUI>()[0].text = usuario.email;
-            PlayerPrefs.SetString("email", usuario.email);
-            telaConta.GetComponentsInChildren<TMP_InputField>()[2].GetComponentsInChildren<TextMeshProUGUI>()[0].text = usuario.nick;
-            PlayerPrefs.SetString("nick", usuario.nick);
-            PlayerPrefs.SetString("id", usuario._id);
-            PlayerPrefs.Save();
+            carregamento.SetTrigger("carregar");
+            if (!string.IsNullOrEmpty(nick))
+            {
+                usuario = JsonUtility.FromJson<Usuario>(getRequest.downloadHandler.text);
+                telas.SetTrigger("Conta");
+                telaConta.GetComponentsInChildren<TMP_InputField>()[0].GetComponentsInChildren<TextMeshProUGUI>()[0].text = usuario.nome;
+                PlayerPrefs.SetString("nome", usuario.nome);
+                telaConta.GetComponentsInChildren<TMP_InputField>()[1].GetComponentsInChildren<TextMeshProUGUI>()[0].text = usuario.email;
+                PlayerPrefs.SetString("email", usuario.email);
+                telaConta.GetComponentsInChildren<TMP_InputField>()[2].GetComponentsInChildren<TextMeshProUGUI>()[0].text = usuario.nick;
+                PlayerPrefs.SetString("nick", usuario.nick);
+                PlayerPrefs.SetString("id", usuario._id);
+                PlayerPrefs.Save();
+            }
+            else
+            {
+                telas.SetTrigger("Login");
+                telaErro.SetActive(true);
+                telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Usuario não Encontrado";
+            }
         }
     }
 }

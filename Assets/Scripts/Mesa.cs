@@ -7,11 +7,10 @@ public class Mesa
 {
     public string _id;
     public string nome;
-    public string senha;
-    public float dinheiroPorJogador;
+    public string tema;
     public string responsavel_fk;
-    public int limitJogadores;
     public int limitPerguntas;
     public string codSala;
     public int __v;
+    public bool publico;
 }
