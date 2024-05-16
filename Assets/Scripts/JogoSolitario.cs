@@ -49,6 +49,7 @@ public class JogoSolitario : MonoBehaviour
     public TMP_InputField telaApostaFinal;
     public Slider sliderApostaFinal;
     public ListaPerguntas grupoPerguntas;
+    public Animator acerto;
 
     //tela loja - power ups
     public GameObject powerUps;
@@ -124,11 +125,9 @@ public class JogoSolitario : MonoBehaviour
 
     void Start()
     {
-        timeOut = false;
         recorde = new RecordeLimitado();
         dataAnterior = DateTime.Now;
         dataPosterior = new DateTime(dataAnterior.Year + 1, dataAnterior.Month, dataAnterior.Day);
-        Debug.Log("Ano: " + dataAnterior.Year);
         filtrosData[0].value = dataAnterior.Day - 1;
         filtrosData[1].value = dataAnterior.Month - 1;
         filtrosData[2].value = dataAnterior.Year - 2022;
@@ -181,7 +180,6 @@ public class JogoSolitario : MonoBehaviour
                 if (timer2 < 0)
                 {
                     passouPunch = false;
-                    Debug.Log("5050p = " + index5050[0]);
                     jogo.GetComponent<Animator>().SetInteger("5050p", index5050[0]);
                 }
             }
@@ -224,13 +222,13 @@ public class JogoSolitario : MonoBehaviour
             {
                 temporizadorTela.GetComponentsInChildren<TextMeshProUGUI>()[0].text = temporizador.ToString("N0");
             }
-            if (temporizador < 0)
+            if (temporizador <= 0)
             {
                 temporizadorJogo = false;
                 gamecontroller.audioSource.EfeitoSonoro(gamecontroller.audioSource.errouSom);
-                Palpite(0);
                 telaAposta.text = "0";
                 timeOut = true;
+                Palpite(0);
                 ApostaFinal(telaAposta);
             }
         }
@@ -520,7 +518,6 @@ public class JogoSolitario : MonoBehaviour
             }
             if(auxListaMesasOff != null)
             {
-                Debug.Log("mesa gravada: " + auxListaMesasOff.listaOffline[0].sala.nome);
                 foreach (SalaPerguntas salaMesa in auxListaMesasOff.listaOffline)
                 {
                     bool grava = true;
@@ -577,6 +574,7 @@ public class JogoSolitario : MonoBehaviour
 
     public void RestartGame()
     {
+        gamecontroller.FecharJogo = false;
         timeOut = false;
         recordDinheiro = 0;
         gamecontroller.FecharJogo = false;
@@ -600,7 +598,6 @@ public class JogoSolitario : MonoBehaviour
 
         foreach (Perguntas pergunta in grupoPerguntas.listaPerguntas)
         {
-            Debug.Log("pergunta: " + pergunta.pergunta);
             perguntasInMemory.Add(pergunta);
         }
 
@@ -742,21 +739,27 @@ public class JogoSolitario : MonoBehaviour
         apostaTela.GetComponentsInChildren<SpriteUIAnimator>()[0].Func_PlayUIAnim();
         if (palpite == alternativa)
         {
+            acerto.SetTrigger("acerto");
             gamecontroller.audioSource.Acertou();
             acertos++;
             dinheiroInicial += 2 * apostou;
             situacao.text = dinheiroInicial.ToString("N2");
             sliderAposta.maxValue = dinheiroInicial;
             sliderApostaFinal.maxValue = dinheiroInicial;
-            Debug.Log("nnumero de acertos: " + acertos);
         }
         else if (bloqueioJogo)
         {
+            acerto.SetTrigger("erro");
             gamecontroller.audioSource.Errou();
             dinheiroInicial += apostou;
             situacao.text = dinheiroInicial.ToString("N2");
             sliderAposta.maxValue = dinheiroInicial;
             sliderApostaFinal.maxValue = dinheiroInicial;
+        }
+        else
+        {
+            acerto.SetTrigger("erro");
+            gamecontroller.audioSource.Errou();
         }
 
         string pergunta_fk = salaPerguntas.listaPerguntas[indexPerguntaAtual]._id;
@@ -902,7 +905,7 @@ public class JogoSolitario : MonoBehaviour
 
     public void ConfirmarTelaNick()
     {
-        if (string.IsNullOrEmpty(nick))
+        if (string.IsNullOrEmpty(nick.Trim()))
         {
             telaErroPrincipal.SetActive(true);
             telaErroPrincipal.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Nick não preenchido.";
@@ -944,19 +947,25 @@ public class JogoSolitario : MonoBehaviour
             if (auxListaRecordes.listaRecorde.Length > 0)
             {
                 List<Recorde> listaRecorde = new List<Recorde>();
+                bool adicionar = true;
                 for (int i = 0; i < auxListaRecordes.listaRecorde.Length; i++)
                 {
                     listaRecorde.Add(auxListaRecordes.listaRecorde[i]);
 
                     for(int j = 0; j < nickFiltroDropdown.options.Count; j++)
                     {
-                        if (auxListaRecordes.listaRecorde[i].nick != nickFiltroDropdown.options[j].text)
+                        if (auxListaRecordes.listaRecorde[i].nick == nickFiltroDropdown.options[j].text)
                         {
-                            TMP_Dropdown.OptionData nickOption = new TMP_Dropdown.OptionData();
-
-                            nickOption.text = auxListaRecordes.listaRecorde[i].nick;
-                            nickFiltroDropdown.options.Add(nickOption);
+                            adicionar = false;
                         }
+                    }
+
+                    if (adicionar)
+                    {
+                        TMP_Dropdown.OptionData nickOption = new TMP_Dropdown.OptionData();
+
+                        nickOption.text = auxListaRecordes.listaRecorde[i].nick;
+                        nickFiltroDropdown.options.Add(nickOption);
                     }
                 }
                 listaRecorde.Sort((player1, player2) => player2.valor.CompareTo(player1.valor));
@@ -999,7 +1008,10 @@ public class JogoSolitario : MonoBehaviour
 
     private IEnumerator GravarRecordeSala(string cod)
     {
-        carregamento.SetTrigger("carregar");
+        if (!recorde.logado)
+        {
+            carregamento.SetTrigger("carregar");
+        }
         var getRequest = gamecontroller.CreateRequest(
             gamecontroller.UrlRota + "/recorde/criar",
             false,
@@ -1025,7 +1037,6 @@ public class JogoSolitario : MonoBehaviour
 
     public void GameOver(bool logado, bool gravar)
     {
-        Debug.Log("entrou: " + logado + ";" + gravar);
         if (gravar)
         {
             if (logado)
@@ -1042,9 +1053,6 @@ public class JogoSolitario : MonoBehaviour
             recorde.sala_cod = codSala;
             recorde.valor = recordDinheiro;
             recorde.pcent_acertos = (float)acertos / salaPerguntas.sala.limitPerguntas * 100f;
-            Debug.Log("acertos: " + acertos);
-            Debug.Log("total: " + salaPerguntas.sala.limitPerguntas);
-            Debug.Log("pcent: " + recorde.pcent_acertos);
             ListaEstatisticaDTO dto = new ListaEstatisticaDTO();
             dto.listaEstatistica = listaEstatisticaJogo.ToArray();
             StartCoroutine(CreateEstatisticaRequest(dto));
@@ -1057,6 +1065,7 @@ public class JogoSolitario : MonoBehaviour
             gameOverOffline.GetComponent<Animator>().SetTrigger("offline");
             recordeTextoOff.text = recordDinheiro.ToString("F2");
         }
+        gamecontroller.FecharJogo = true;
     }
 
     public void AbrirFecharFiltro()
@@ -1068,6 +1077,7 @@ public class JogoSolitario : MonoBehaviour
     {
         List<RecordeData> listaRecordeAux = new List<RecordeData>();
         List<RecordeData> listaFiltrada = new List<RecordeData>();
+        List<Recorde> listaFiltradaFinal = new List<Recorde>();
         Dictionary<string, float> maiorPontuacaoPorJogador = new Dictionary<string, float>();
         foreach (Recorde recorde in recordesCompleto.listaRecorde)
         {
@@ -1082,8 +1092,18 @@ public class JogoSolitario : MonoBehaviour
             {
                 maiorPontuacaoPorJogador.Add(recorde.nick, recorde.valor);
             }
+            string dataCorrigida = "";
+            if (recorde.data[6] == '-')
+            {
+                dataCorrigida = recorde.data.Insert(5, "0");
+            }
+            else
+            {
+                dataCorrigida = recorde.data;
+            }
+
             DateTime data;
-            if (DateTime.TryParseExact(recorde.data, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out data))
+            if (DateTime.TryParseExact(dataCorrigida, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out data))
             {
                 Debug.Log("Data Convertida: " + data.ToString("dd/MM/yyyy"));
             }
@@ -1110,29 +1130,40 @@ public class JogoSolitario : MonoBehaviour
             bool logado = ((logadoFiltro && objeto.logado) || (!logadoFiltro && objeto.logado) || (!logadoFiltro && !objeto.logado));
             bool dataFiltro = (objeto.data >= dataAnterior) && (objeto.data <= dataPosterior);
             bool data = (tudoData || dataFiltro);
-            bool igualNick = objeto.nick == nickFiltro;
-            bool nickPreenchidoFiltro = !string.IsNullOrEmpty(nickFiltro);
-            bool nick = ((nickPreenchidoFiltro && igualNick) || (!nickPreenchidoFiltro && igualNick) || (!nickPreenchidoFiltro && !igualNick));
-            bool nickRepetido = !nomesRepetidos && (maiorPontuacaoPorJogador[objeto.nick] == objeto.valor);
+            bool nickRepetido = true;
+            bool igualNick = true;
 
-            return logado && data && nick && nickRepetido;
+            if (nickFiltro != string.Empty)
+            {
+                igualNick = objeto.nick == nickFiltro;
+            }
+             
+            if (!nomesRepetidos)
+            {
+                nickRepetido = maiorPontuacaoPorJogador[objeto.nick] == objeto.valor;
+            }
+
+            return logado && data && igualNick && nickRepetido;
         }).ToList();
-       
-        recordes.listaRecorde = new Recorde[listaFiltrada.Count];
 
-        for(int i = 0; i < listaFiltrada.Count; i++)
+        recordes = new ListaRecorde();
+        foreach(RecordeData recordeData in listaFiltrada)
         {
-            recordes.listaRecorde[i]._id = listaFiltrada[i]._id;
-            recordes.listaRecorde[i].sala_fk = listaFiltrada[i].sala_fk;
-            recordes.listaRecorde[i].player_fk = listaFiltrada[i].player_fk;
-            recordes.listaRecorde[i].nick = listaFiltrada[i].nick;
-            recordes.listaRecorde[i].logado = listaFiltrada[i].logado;
-            recordes.listaRecorde[i].valor = listaFiltrada[i].valor;
-            recordes.listaRecorde[i].pcent_acertos = listaFiltrada[i].pcent_acertos;
-            recordes.listaRecorde[i].data = listaFiltrada[i].data.ToString("yyyy-MM-dd");
-            recordes.listaRecorde[i].__v = listaFiltrada[i].__v;
+            Recorde recorde = new Recorde();
+            recorde._id = recordeData._id;
+            recorde.sala_fk = recordeData.sala_fk;
+            recorde.player_fk = recordeData.player_fk;
+            recorde.nick = recordeData.nick;
+            recorde.logado = recordeData.logado;
+            recorde.valor = recordeData.valor;
+            recorde.pcent_acertos = recordeData.pcent_acertos;
+            recorde.data = recordeData.data.ToString("yyyy-MM-dd");
+            recorde.__v = recordeData.__v;
+            listaFiltradaFinal.Add(recorde);
         }
+        recordes.listaRecorde = listaFiltradaFinal.ToArray();
         filtroTela.GetComponent<Animator>().SetTrigger("filtro");
+        OrganizandoRecordesTela();
     }
 
     //Alternativa escolhida
@@ -1171,7 +1202,6 @@ public class JogoSolitario : MonoBehaviour
         }
         else
         {
-            Debug.Log("Gravado Estatistica");
             StartCoroutine(GravarRecordeSala(codSala));
         }
     }
@@ -1253,7 +1283,6 @@ public class JogoSolitario : MonoBehaviour
         else if (index == 1)
         {
             //5050
-            Debug.Log("indexButton = " + indexButton);
             jogo.GetComponent<Animator>().SetInteger("5050", (1 + indexButton));
             int y = 0;
             while (aux == 0)
@@ -1273,7 +1302,6 @@ public class JogoSolitario : MonoBehaviour
                     aux = 1;
                 }
             }
-            Debug.Log("i = " + i + " ; y = " + y);
             if ((i == 1 && y == 2) || (i == 2 && y == 1))
             {
                 index5050[0] = 1;
@@ -1288,7 +1316,6 @@ public class JogoSolitario : MonoBehaviour
             }
             else if ((i == 2 && y == 3) || (i == 3 && y == 2))
             {
-                Debug.Log("5050p = " + 4);
                 index5050[0] = 4;
             }
             else if ((i == 2 && y == 4) || (i == 4 && y == 2))

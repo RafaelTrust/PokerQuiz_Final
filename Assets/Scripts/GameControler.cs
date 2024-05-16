@@ -160,6 +160,8 @@ public class GameControler : MonoBehaviour
     {
         var request = new UnityWebRequest(path, type.ToString());
 
+        request.timeout = 10;
+
         if (jsonBody != null)
         {
             Debug.Log(jsonBody);
@@ -231,8 +233,6 @@ public class GameControler : MonoBehaviour
         {
             obj.gameObject.SetActive(true);
         }
-        Debug.Log("numero de itens na lista: " + listaObj.Count);
-        Debug.Log("numero de itens na lista tela: " + listaObjTela.Length);
         if (listaObj.Count < n)
         {
             for (int i = 0; i < listaObjTela.Length; i++)

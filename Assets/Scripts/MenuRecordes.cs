@@ -191,13 +191,16 @@ public class MenuRecordes : MonoBehaviour
 
     public void BuscarMinhaMesaRecordeButton()
     {
-
         codSala = codBusca;
         telaEscolha.SetActive(true);
     }
 
     public void BuscarMinhaMesaRecorde()
     {
+        jogoSolitario.logadoToggle.isOn = false;
+        jogoSolitario.TudoDataToggle(true);
+        jogoSolitario.NickEscolhidoDropdown(0);
+        jogoSolitario.NomesRepetidosDataToggle(true);
         telaEscolha.SetActive(false);
         StartCoroutine(jogoSolitario.ListaRecordeSala(codSala, true));
     }
@@ -279,8 +282,33 @@ public class MenuRecordes : MonoBehaviour
         {
             conjuntoMesas = new ListaMesas();
             auxPesqMesas = new ListaMesas();
-            conjuntoMesas = JsonUtility.FromJson<ListaMesas>(getRequest.downloadHandler.text);
-            auxPesqMesas = JsonUtility.FromJson<ListaMesas>(getRequest.downloadHandler.text);
+            ListaMesas auxListaPublicaOnline = JsonUtility.FromJson<ListaMesas>(getRequest.downloadHandler.text);
+            List<Mesa> listaMesas = new List<Mesa>();
+            foreach(Mesa mesa in auxListaPublicaOnline.mesas)
+            {
+                listaMesas.Add(mesa);
+            }
+            ListaJogoOffline auxSalaPerguntas = JsonUtility.FromJson<ListaJogoOffline>(PlayerPrefs.GetString("salaPerguntasOffiline"));
+            if(auxSalaPerguntas != null)
+            {
+                foreach (SalaPerguntas salaPergunta in auxSalaPerguntas.listaOffline)
+                {
+                    bool adicionar = true;
+                    foreach (Mesa mesa in listaMesas)
+                    {
+                        if (salaPergunta.sala._id == mesa._id)
+                        {
+                            adicionar = false;
+                        }
+                    }
+                    if (adicionar)
+                    {
+                        listaMesas.Add(salaPergunta.sala);
+                    }
+                }
+            }
+            conjuntoMesas.mesas = listaMesas.ToArray();
+            auxPesqMesas.mesas = listaMesas.ToArray();
             StartCoroutine(GetListaMesasRequest());
         }
     }
@@ -299,7 +327,8 @@ public class MenuRecordes : MonoBehaviour
             carregamento.SetTrigger("carregar");
             telasAnimator.SetTrigger("Recorde");
             telaErroPrincipal.SetActive(true);
-            telaErroPrincipal.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Usuario n„o Encontrado. \n… necess·rio estar logado para acessar esse modulo";
+            telaErroPrincipal.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Usuario n„o logado. \n para acessar suas mesas precisa estar logado";
+            OrganizandoMesas();
             Debug.LogError(getRequest.error);
         }
         else
@@ -312,19 +341,22 @@ public class MenuRecordes : MonoBehaviour
             {
                 listaMesas.Add(mesa);
             }
-            foreach(Mesa mesa in auxListaMesa.mesas)
+            if(auxListaMesa != null)
             {
-                bool adicionar = true;
-                foreach(Mesa mesaPublica in listaMesas)
+                foreach (Mesa mesa in auxListaMesa.mesas)
                 {
-                    if(mesa.codSala == mesaPublica.codSala)
+                    bool adicionar = true;
+                    foreach (Mesa mesaPublica in listaMesas)
                     {
-                        adicionar = false;
+                        if (mesa.codSala == mesaPublica.codSala)
+                        {
+                            adicionar = false;
+                        }
                     }
-                }
-                if (adicionar)
-                {
-                    listaMesas.Add(mesa);
+                    if (adicionar)
+                    {
+                        listaMesas.Add(mesa);
+                    }
                 }
             }
             conjuntoMesas = new ListaMesas();

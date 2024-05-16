@@ -226,14 +226,30 @@ public class Conta : MonoBehaviour
     {
         senhaEditar = true;
         tempUsuario.senha = senha.text;
-        StartCoroutine(UpdateRequest());
+        if (validacaoSenha)
+        {
+            StartCoroutine(UpdateRequest());
+        }
+        else
+        {
+            telaErro.SetActive(true);
+            telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Erro ao cadastrar nova senha. \n Senha tem que ser mais forte";
+        }
     }
 
     public void TrocarSenhaEsqueceu(TMP_InputField senha)
     {
         senhaEsqueceu = true;
         tempUsuario.senha = senha.text;
-        StartCoroutine(UpdateRequest());
+        if (validacaoSenha)
+        {
+            StartCoroutine(UpdateRequest());
+        }
+        else
+        {
+            telaErro.SetActive(true);
+            telaErro.GetComponentsInChildren<TextMeshProUGUI>()[1].text = "Erro ao cadastrar nova senha. \n Senha tem que ser mais forte";
+        }
     }
 
     public void BuscarEmailEsqueceuSenha(TMP_InputField email)
@@ -259,7 +275,7 @@ public class Conta : MonoBehaviour
         var getRequest = gameController.CreateRequest(
             gameController.UrlRota + "/usuarios/" + usuario._id,
             true,
-            GameControler.RequestType.PATCH,
+            GameControler.RequestType.POST,
             JsonUtility.ToJson(tempUsuario)
             );
         yield return getRequest.SendWebRequest();
@@ -421,12 +437,10 @@ public class Conta : MonoBehaviour
 
     private IEnumerator VerificaNickRequest()
     {
-        carregamento.SetTrigger("carregar");
         var getRequest = gameController.CreateRequest(gameController.UrlRota + "/usuarios/verifica-nick/" + tempUsuario.nick.Replace("\u200b", ""), false, GameControler.RequestType.GET, null);
         yield return getRequest.SendWebRequest();
         if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
-            carregamento.SetTrigger("carregar");
             validacaoNick = false;
             if (tipoCadastro)
             {
@@ -439,7 +453,6 @@ public class Conta : MonoBehaviour
         }
         else
         {
-            carregamento.SetTrigger("carregar");
             validacaoNick = true;
             if (tipoCadastro)
             {
@@ -455,18 +468,15 @@ public class Conta : MonoBehaviour
 
     private IEnumerator VerificaEmailRequest()
     {
-        carregamento.SetTrigger("carregar");
         var getRequest = gameController.CreateRequest(gameController.UrlRota + "/usuarios/verifica-email/" + tempUsuario.email.Replace("\u200b", ""), false, GameControler.RequestType.GET, null);
         yield return getRequest.SendWebRequest();
         if (getRequest.result == UnityWebRequest.Result.ConnectionError || getRequest.result == UnityWebRequest.Result.ProtocolError)
         {
-            carregamento.SetTrigger("carregar");
             validacaoEmail = false;
             telaCadastro.GetComponentsInChildren<TMP_InputField>()[2].GetComponentsInChildren<TextMeshProUGUI>()[1].color = gameController.HexToColor("#FF4747");
         }
         else
         {
-            carregamento.SetTrigger("carregar");
             validacaoEmail = true;
             telaCadastro.GetComponentsInChildren<TMP_InputField>()[2].GetComponentsInChildren<TextMeshProUGUI>()[1].color = gameController.HexToColor("#75EC51");
         }

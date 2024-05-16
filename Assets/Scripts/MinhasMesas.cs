@@ -254,11 +254,6 @@ public class MinhasMesas : MonoBehaviour
     private IEnumerator CreateMesaRequest()
     {
         carregamento.SetTrigger("carregar");
-        Debug.Log("Mesa: \nNome: " + formMesa.nome 
-            + "\ntema: " + formMesa.tema
-            + "\nLimite Perguntas: " + formMesa.limitPerguntas
-            + "\nResponsavel: " + formMesa.responsavel_fk
-            );
         var getRequest = gameControler.CreateRequest(
             gameControler.UrlRota + "/salas/cadastro",
             true,
@@ -442,7 +437,6 @@ public class MinhasMesas : MonoBehaviour
 
     private IEnumerator CreateListaPerguntaRequest(List<PerguntaOnlineLimitado> listaPergunta)
     {
-        Debug.Log("id da mesa:" + mesaRes._id);
         foreach(PerguntaOnlineLimitado pergunta in listaPergunta)
         {
             pergunta.sala_fk = mesaRes._id;
@@ -462,7 +456,6 @@ public class MinhasMesas : MonoBehaviour
             }
         }
         carregamento.SetTrigger("carregar");
-        Debug.Log("numero mesas: " + conjuntoMesas.mesas.Length);
         OrganizandoMesas();
         telas.SetTrigger("CriarPergunta");
     }
@@ -508,7 +501,7 @@ public class MinhasMesas : MonoBehaviour
         var getRequest = gameControler.CreateRequest(
             gameControler.UrlRota + "/perguntas/" + id,
             true,
-            GameControler.RequestType.PATCH,
+            GameControler.RequestType.POST,
             JsonUtility.ToJson(formPergunta)
             );
         yield return getRequest.SendWebRequest();
@@ -793,7 +786,7 @@ public class MinhasMesas : MonoBehaviour
         var getRequest = gameControler.CreateRequest(
             gameControler.UrlRota + "/salas/" + mesaRes._id,
             true,
-            GameControler.RequestType.PATCH,
+            GameControler.RequestType.POST,
             JsonUtility.ToJson(formMesa)
             );
         yield return getRequest.SendWebRequest();
@@ -850,7 +843,6 @@ public class MinhasMesas : MonoBehaviour
             formMesa = new MesaLimitado();
             formMesa.tema = string.Empty;
             temaMesa = mesaRes.tema;
-            Debug.Log("tema buscado: " + mesaRes.tema);
             ColocandoValores();
         }
     }
@@ -958,7 +950,6 @@ public class MinhasMesas : MonoBehaviour
         {
             mesa.SetActive(true);
         }
-        Debug.Log("numero de mesas: " + conjuntoMesas.mesas.Length);
         if (conjuntoMesas.mesas.Length > 4)
         {
             paginacaoAnteriorMesa.SetActive(false);
