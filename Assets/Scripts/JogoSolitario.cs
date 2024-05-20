@@ -655,16 +655,6 @@ public class JogoSolitario : MonoBehaviour
         }
     }
 
-    public void InputValor(string valor)
-    {
-        sliderAposta.value = float.Parse(valor);
-    }
-
-    public void InputValorFinal(string valor)
-    {
-        sliderApostaFinal.value = float.Parse(valor);
-    }
-
     //Apostas
 
     public void Apostando(TMP_InputField valor)

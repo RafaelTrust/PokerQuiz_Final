@@ -98,7 +98,7 @@ public class MinhasMesas : MonoBehaviour
         var getRequest = gameControler.CreateRequest(
             gameControler.UrlRota + "/perguntas/ai-generate",
             true,
-            GameControler.RequestType.GET,
+            GameControler.RequestType.POST,
             JsonUtility.ToJson(gerar)
             );
         yield return getRequest.SendWebRequest();
